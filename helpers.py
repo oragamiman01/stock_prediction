@@ -31,6 +31,17 @@ def directional_accuracy_pct_change(gt_pct, pred_pct):
     pred_sign = np.sign(np.asarray(pred_pct))
     return np.sum(gt_sign == pred_sign) / len(gt_pct)
 
+def rename_cols(df, suffix, exclude):
+    new_names = dict()
+    cols = list(df.columns)
+    for n in exclude:
+        cols.remove(n)
+    for c in cols:
+        new_names[c] = c + suffix
+
+    df = df.rename(columns=new_names)
+    return df
+
 
 def z_norm(df, col_exclude=None):
     """Performs z-score normalization on all columns of df except col_exclude
