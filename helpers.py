@@ -1,7 +1,6 @@
 import numpy as np
-import torch
+# import torch
 import pandas as pd
-
 
 
 def directional_accuracy(gt, pred):
@@ -25,6 +24,12 @@ def directional_accuracy(gt, pred):
             acc.append(0)
 
     return np.array(acc).mean()
+
+def directional_accuracy_pct_change(gt_pct, pred_pct):
+
+    gt_sign = np.sign(np.asarray(gt_pct))
+    pred_sign = np.sign(np.asarray(pred_pct))
+    return np.sum(gt_sign == pred_sign) / len(gt_pct)
 
 
 def z_norm(df, col_exclude=None):
@@ -85,7 +90,7 @@ def to_sequences(seq_size: int, obs: np.array):
         y.append(after_window)
     return x, y
 
-def process_results(model_out: torch.Tensor, batch_size: int, 
+def process_results(model_out, batch_size: int, 
                     batch_num: int, dates: list, tickers: list):
     """Function to process output tensor from network into usable data.
     Each batch output needs to be put in the correct list for its company
