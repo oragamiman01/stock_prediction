@@ -26,7 +26,17 @@ def directional_accuracy(gt, pred):
     return np.array(acc).mean()
 
 def directional_accuracy_pct_change(gt_pct, pred_pct):
-
+    """Calculates directional accuracy of given ground truth and 
+    prediction percent change series.
+    From Kaeley et al.
+    
+    inputs:
+        gt_pct: ground truth pct_change
+        pred_pct: predicted pct_change
+        
+    returns:
+        acc: directional accuracy of predicted values
+    """
     gt_sign = np.sign(np.asarray(gt_pct))
     pred_sign = np.sign(np.asarray(pred_pct))
     return np.sum(gt_sign == pred_sign) / len(gt_pct)
@@ -132,24 +142,3 @@ def process_results(model_out, batch_size: int,
         
     return processed
 
-def directional_accuracy(gt, pred):
-    """Calculates directional accuracy of given ground truth and prediction series.
-    From Kaeley et al. https://arxiv.org/pdf/2305.14368.pdf
-    
-    inputs:
-        gt: ground truth prices
-        pred: predicted prices
-        
-    returns:
-        acc: directional accuracy of predicted values
-    """
-    acc = []
-    for i in range(1, len(gt)):
-        if gt[i] >= gt[i-1] and pred[i] >= gt[i-1]:
-            acc.append(1)
-        elif gt[i] < gt[i-1] and pred[i] < gt[i-1]:
-            acc.append(1)
-        else:
-            acc.append(0)
-
-    return np.array(acc).mean()
