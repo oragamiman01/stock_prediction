@@ -41,6 +41,23 @@ def directional_accuracy_pct_change(gt_pct, pred_pct):
     pred_sign = np.sign(np.asarray(pred_pct))
     return np.sum(gt_sign == pred_sign) / len(gt_pct)
 
+def directional_accuracy_prob(gt_pct, pred_pct):
+    """Calculates directional accuracy of given ground truth and 
+    prediction percent change series.
+    From Kaeley et al.
+    
+    inputs:
+        gt_pct: ground truth pct_change
+        pred_pct: predicted probability of positive pct_change
+        
+    returns:
+        acc: directional accuracy of predicted values
+    """
+    gt_sign = np.sign(np.asarray(gt_pct))
+    pred_sign = np.array(pred_pct)
+    pred_sign = pred_sign >= 0.5
+    return np.sum(gt_sign == pred_sign) / len(gt_pct)
+
 def rename_cols(df, suffix, exclude):
     new_names = dict()
     cols = list(df.columns)
@@ -53,7 +70,7 @@ def rename_cols(df, suffix, exclude):
     return df
 
 
-def z_norm(df, col_exclude=None):
+def z_norm(df, col_exclude: list = None):
     """Performs z-score normalization on all columns of df except col_exclude
     
     inputs:
@@ -69,7 +86,7 @@ def z_norm(df, col_exclude=None):
     stat_dict = dict()
     df_std = df.copy()
     cols = list(df.columns)
-    cols.remove(col_exclude)
+    [cols.remove(c) for c in col_exclude]
     for c in cols:
         stat_dict[c] = (df[c].mean(), df[c].std()) #
         df_std[c] = (df[c] - df[c].mean()) / df[c].std()
