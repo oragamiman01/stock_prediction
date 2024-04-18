@@ -159,3 +159,29 @@ def process_results(model_out, batch_size: int,
         
     return processed
 
+def process_results_incremental(model_out, date: pd.Timestamp, tickers: list):
+    """Function to process output tensor from network into usable data.
+    Each batch output needs to be put in the correct list for its company
+
+    inputs:
+        model_out: tensor of size (batch_size, num_features)
+        batch_size: batch size of dataloader
+        batch_num: which batch is the loop on
+        dates: list of dates that line up with the rows of the output data
+        tickers: list of ticker symbols
+
+    returns:
+        processed: list of arrays
+    """
+
+    processed = []
+
+    for idx, batch_out in enumerate(model_out):
+        pred_list = batch_out.detach().tolist()
+        # ticker is last column since date was dropped
+        # change from model output ticker to character ticker
+        pred_list.append(tickers[idx])
+        pred_list.append(date[tickers[idx]]) # add prediction date to list
+        processed.append(pred_list) # add to overall 2d array
+        
+    return processed
