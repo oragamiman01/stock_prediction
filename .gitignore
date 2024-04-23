@@ -2,3 +2,5 @@ data/*/*
 .DS_Store
 saved_models/*
 __pycache__
+.idea
+CREDENTIALS.py

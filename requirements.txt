@@ -1,0 +1,15 @@
+jupyter
+pandas
+numpy
+matplotlib
+tqdm
+torch
+beautifulsoup4
+newspaper3k
+lxml[html_clean]
+nltk
+
+transformers
+
+openbb
+openbb-tmx
