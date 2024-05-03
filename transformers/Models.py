@@ -63,7 +63,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-# public methods are constructor, train, and load_model
+# public methods are constructor, train, evaluate, and load_model
 class TransformerAgent:
     def __init__(self, embedding_dim, hidden_dim, num_atn_heads, num_layers, device, checkpoint_dir, init_lr, lr_decay, min_lr, decay_lr_every, dropout=0.1):
         self.checkpoint_dir = checkpoint_dir
@@ -81,7 +81,7 @@ class TransformerAgent:
         scheduler_lamb = lambda epoch: max(lr_decay ** (epoch // decay_lr_every), min_lr / init_lr)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, scheduler_lamb)
 
-        self.criterion = nn.MSELoss()
+        self.criterion = nn.MSELoss(reduction="sum")
 
     def load_model(self, model_path):
         checkpoint = torch.load(model_path)
@@ -135,7 +135,7 @@ class TransformerAgent:
                 actual_after = y[:, 0]
                 actual_prev_day = y[:, 1]
 
-                logits = self.model(X).squeeze()
+                logits = self.model(X).squeeze(-1)  # -1 in case batch size ends up being 1
                 logits = logits[:, -1]
 
                 metric_true = (actual_after - actual_prev_day) / actual_prev_day
@@ -146,7 +146,7 @@ class TransformerAgent:
                 self.optimizer.zero_grad()
                 loss.backward()
                 # TODO is this good?
-                # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
 
                 epoch_loss += loss.item()
@@ -160,7 +160,7 @@ class TransformerAgent:
             if self.cur_epoch % 25 == 0:
                 self.__save_model()
 
-            average_loss = epoch_loss / len(dataloader.dataset)
+            average_loss = epoch_loss / len(dataloader.dataset)  # epoch loss is the sum of each sample's loss since mse reduction is sum
             print(f"Epoch {self.cur_epoch}, Loss: {epoch_loss:.4f}; Average Loss: {average_loss}; lr: {self.scheduler.get_last_lr()}")
 
         self.model.eval()
@@ -170,7 +170,7 @@ class TransformerAgent:
     def evaluate(self, dataloader):
         self.model.eval()
         total_loss = 0
-        for (X, y) in dataloader:
+        for batch, (X, y) in enumerate(dataloader):
             X = X.to(self.device)
             y = y.to(self.device)
 
@@ -178,19 +178,23 @@ class TransformerAgent:
             actual_after = y[:, 0]
             actual_prev_day = y[:, 1]
 
-            logits = self.model(X).squeeze()
+            logits = self.model(X).squeeze(-1)  # -1 in case batch size ends up being 1
             logits = logits[:, -1]
 
             metric_true = (actual_after - actual_prev_day) / actual_prev_day
             metric_pred = (logits - actual_prev_day) / actual_prev_day
 
-            # TODO print the actual calculated MSE for each row and the raw values used to do so (actualprevday, actual after, logits)
-            # and print loss.item() to make sure pytorchs loss is just getting the average mse
-
             loss = self.criterion(metric_true, metric_pred)
             total_loss += loss.item()
 
-        print(f"Average Loss: {total_loss / len(dataloader.dataset)}")
+            manual_mse = torch.pow(metric_pred - metric_true, 2)
+
+            if batch % 100 == 0:
+                print(f"!!!!!!!!!!!!!!!!\nBatch {batch}\n!!!!!!!!!!!!!!!\nactual prev day: {actual_prev_day}\n\n"
+                      f"actual after: {actual_after}\n\npredicted after: {logits}\n\nmse: {manual_mse}\n\n"
+                      f"pytorch loss: {loss.item()}")
+
+        print(f"Average Loss: {total_loss / len(dataloader.dataset)}")  # total loss is the sum of each sample's loss since mse reduction is sum
 
 
 
