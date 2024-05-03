@@ -5,3 +5,5 @@ __pycache__
 .idea
 CREDENTIALS.py
 sentimentsRaw
+transformers/all_V1
+transformers/checkpoints
