@@ -97,11 +97,11 @@ def get_all_time_series(data_dir, normalize=False):
     all_tickers = get_ticker_list(data_dir)
     return {ticker: get_time_series(ticker, data_dir, normalize) for ticker in all_tickers}
 
-def get_some_time_series(data_dir, tickers: list, normalize=False):
+def get_some_time_series(tickers: list, data_dir, normalize=False):
     """
         Same as get_all_dime_series except for a specific list of company tickers.
     """
-    
+
     return {ticker: get_time_series(ticker, data_dir, normalize) for ticker in tickers}
 
 
