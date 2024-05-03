@@ -69,7 +69,7 @@ def get_ticker_list(data_dir):
     return ticker_array
 
 
-def get_time_series(ticker, data_dir):
+def get_time_series(ticker, data_dir, normalize=False):
     """
         Generate a time series (list) of dictionaries for the given ticker. The dictionaries contain values described
         at the top of this file
@@ -77,7 +77,7 @@ def get_time_series(ticker, data_dir):
 
     # the raw stock data contains, for each day, the entries in the javadoc comments at the top of the file
     # initialize our time series with the raw OBB data - kept in order of date
-    time_series = _helper_load_obb_raw_historical(ticker, data_dir)
+    time_series = _helper_load_obb_raw_historical(ticker, data_dir, normalize)
 
     # add the general_news_sentiment data, ensuring the dates align
     time_series = _helper_add_general_news_sentiment(time_series, data_dir)
@@ -88,19 +88,26 @@ def get_time_series(ticker, data_dir):
     return time_series
 
 
-def get_all_time_series(data_dir):
+def get_all_time_series(data_dir, normalize=False):
     """
         Generate a dictionary of {ticker -> time series} entries for all tickers in our data bank.
         Each entry in a given time series contains the values described at the top of this file
     """
 
     all_tickers = get_ticker_list(data_dir)
-    return {ticker: get_time_series(ticker, data_dir) for ticker in all_tickers}
+    return {ticker: get_time_series(ticker, data_dir, normalize) for ticker in all_tickers}
+
+def get_some_time_series(data_dir, tickers: list, normalize=False):
+    """
+        Same as get_all_dime_series except for a specific list of company tickers.
+    """
+    
+    return {ticker: get_time_series(ticker, data_dir, normalize) for ticker in tickers}
 
 
 ############################################################################################################
 
-def _helper_load_obb_raw_historical(ticker, data_dir):
+def _helper_load_obb_raw_historical(ticker, data_dir, z_norm=False):
     if not os.path.isdir(f'{data_dir}/obbRaw/{ticker}'):
         raise Exception(f"There is no directory at '{data_dir}/obbRaw/{ticker}'")
 
@@ -111,9 +118,30 @@ def _helper_load_obb_raw_historical(ticker, data_dir):
     time_series_file = os.path.join(f'{data_dir}/obbRaw/{ticker}', csv_files[0])
     time_series_df = pd.read_csv(time_series_file)
     time_series_df = time_series_df.iloc[:, 1:]
+    if z_norm == True: # normalize data if desired
+        time_series_df = _helper_z_norm(time_series_df, col_exclude=['date', 'pct_change'])
     raw_stock_data_series = time_series_df.to_dict(orient='records')
 
     return raw_stock_data_series
+
+def _helper_z_norm(df, col_exclude: list = None):
+    """Performs z-score normalization on all columns of df except col_exclude
+    
+    inputs:
+        df: raw stock data
+        col_exclude: columns to be excluded from normalization
+        
+    returns:
+        df_std: zero-mean unit-variance standardized data
+    """
+
+    df_std = df.copy()
+    cols = list(df.columns)
+    [cols.remove(c) for c in col_exclude]
+    for c in cols:
+        df_std[c] = (df[c] - df[c].mean()) / df[c].std()
+
+    return df_std
 
 
 def _helper_add_general_news_sentiment(time_series, data_dir):
