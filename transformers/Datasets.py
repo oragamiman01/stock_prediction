@@ -158,3 +158,128 @@ class AllKnobsDataset_test(Dataset):
 
     def __getitem__(self, idx):
         return torch.tensor(self.X[idx]), torch.tensor(self.y[idx])
+
+
+class VariableLengthDataset(Dataset):
+    def __init__(self, tickers: list[str], data_dir: str, lag_days: int, test_days: int, test: bool):
+        self.X = []
+        self.y = []
+        self.tickers = []
+
+        num_to_ticker = dict()
+        ticker_to_num = dict()
+        ids = np.linspace(-1, 1, len(tickers)).round(5)
+        for i, num in enumerate(ids):
+            num_to_ticker[str(num)] = tickers[i]
+            ticker_to_num[tickers[i]] = num
+
+        # get the unix timestamp value for 2024-04-15. Used to scale the date value used as input to the model
+        cur_unix_timestamp = datetime.datetime(year=2024, month=4, day=15).timestamp()
+
+        for ticker in tickers:
+            ordered_time_series = get_time_series(ticker, data_dir, normalize=True)
+
+            if test:
+                idx = range(len(ordered_time_series) - lag_days - test_days, len(ordered_time_series))
+            else:
+                idx = range(lag_days, len(ordered_time_series) - lag_days - test_days)
+
+            # need to get lag_days days of input tokens and predict the lag_days+1 day, and so on
+            for cur_target_idx in idx:
+
+                # get target values
+                cur_target_actual_after = [ticker_to_num[ticker]]
+                for key in ordered_time_series[cur_target_idx]:
+
+                    val = ordered_time_series[cur_target_idx][key]
+                    if key == 'date':
+                        val = (datetime.datetime.strptime(val, "%Y-%m-%d").timestamp()) / cur_unix_timestamp  # scale to small value
+                    cur_target_actual_after.append(val)
+
+                # each "sample" (input) will have multiple tokens. Each token is a vector of the day's values
+                cur_input = []
+
+                for i in range(cur_target_idx - lag_days, cur_target_idx):
+
+                    cur_token = [ticker_to_num[ticker]]
+                    for key in ordered_time_series[cur_target_idx]:
+
+                        val = ordered_time_series[cur_target_idx][key]
+                        if key == 'date':
+                            val = (datetime.datetime.strptime(val, "%Y-%m-%d").timestamp()) / cur_unix_timestamp  # scale to small value
+                        cur_token.append(val)
+
+                    cur_input.append(cur_token)
+
+                self.X.append(cur_input)
+                self.y.append(cur_target_actual_after)
+                self.tickers.append(ticker)
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        return torch.tensor(self.X[idx], dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.float32), self.tickers[idx]
+    
+
+class IncrementalDataset(Dataset):
+    def __init__(self, tickers: list[str], data_dir: str, lag_days: int, test_days: int, test: bool):
+        self.X = []
+        self.y = []
+        self.tickers = []
+
+        num_to_ticker = dict()
+        ticker_to_num = dict()
+        ids = np.linspace(-1, 1, len(tickers)).round(5)
+        for i, num in enumerate(ids):
+            num_to_ticker[str(num)] = tickers[i]
+            ticker_to_num[tickers[i]] = num
+
+        # get the unix timestamp value for 2024-04-15. Used to scale the date value used as input to the model
+        cur_unix_timestamp = datetime.datetime(year=2024, month=4, day=15).timestamp()
+
+        for ticker in tickers:
+            ordered_time_series = get_time_series(ticker, data_dir, normalize=True)
+
+            if test:
+                idx = range(len(ordered_time_series) - lag_days - test_days, len(ordered_time_series) - lag_days - test_days + 1)
+            else:
+                idx = range(lag_days + 1500, len(ordered_time_series) - lag_days - test_days) # CUT OFF OLD PART OF DATA!!!!!!!!!!!!! FYI
+
+            # need to get lag_days days of input tokens and predict the lag_days+1 day, and so on
+            for cur_target_idx in idx:
+
+                # get target values
+                cur_target_actual_after = [ticker_to_num[ticker]]
+                for key in ordered_time_series[cur_target_idx]:
+
+                    val = ordered_time_series[cur_target_idx][key]
+                    if key == 'date':
+                        val = (datetime.datetime.strptime(val, "%Y-%m-%d").timestamp()) / cur_unix_timestamp  # scale to small value
+                    cur_target_actual_after.append(val)
+
+                # each "sample" (input) will have multiple tokens. Each token is a vector of the day's values
+                cur_input = []
+
+                for i in range(cur_target_idx - lag_days, cur_target_idx):
+
+                    cur_token = [ticker_to_num[ticker]]
+                    for key in ordered_time_series[cur_target_idx]:
+
+                        val = ordered_time_series[cur_target_idx][key]
+                        if key == 'date':
+                            val = (datetime.datetime.strptime(val, "%Y-%m-%d").timestamp()) / cur_unix_timestamp  # scale to small value
+                        cur_token.append(val)
+
+                    cur_input.append(cur_token)
+
+                self.X.append(cur_input)
+                self.y.append(cur_target_actual_after)
+                self.tickers.append(ticker)
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        return torch.tensor(self.X[idx], dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.float32), self.tickers[idx]
+
