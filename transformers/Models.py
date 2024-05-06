@@ -78,7 +78,7 @@ class TransformerAgent:
         self.model = EncoderOnlyTransformer(embedding_dim, hidden_dim, num_atn_heads, num_layers, dropout)
         self.model.to(self.device)
 
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=init_lr)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=init_lr)
 
         # at epoch e, lr will be init_lr * scheduler_lamb(e)
         scheduler_lamb = lambda epoch: max(lr_decay ** (epoch // decay_lr_every), min_lr / init_lr)
@@ -149,7 +149,7 @@ class TransformerAgent:
                 self.optimizer.zero_grad()
                 loss.backward()
                 # TODO is this good?
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+                # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
 
                 epoch_loss += loss.item()
@@ -160,7 +160,7 @@ class TransformerAgent:
 
             self.cur_epoch += 1
 
-            if self.cur_epoch % 25 == 0:
+            if self.cur_epoch % 100 == 0:
                 self.__save_model()
 
             average_loss = epoch_loss / len(dataloader.dataset)  # epoch loss is the sum of each sample's loss since mse reduction is sum
@@ -172,6 +172,8 @@ class TransformerAgent:
     @torch.no_grad()
     def evaluate(self, dataloader):
         self.model.eval()
+        true_arr = []
+        pred_arr = []
         total_loss = 0
         for batch, (X, y) in enumerate(dataloader):
             X = X.to(self.device)
@@ -192,19 +194,45 @@ class TransformerAgent:
 
             manual_mse = torch.pow(metric_pred - metric_true, 2)
 
-            if batch % 100 == 0:
-                print(f"!!!!!!!!!!!!!!!!\nBatch {batch}\n!!!!!!!!!!!!!!!\nactual prev day: {actual_prev_day}\n\n"
-                      f"actual after: {actual_after}\n\npredicted after: {logits}\n\nmse: {manual_mse}\n\n"
-                      f"pytorch loss: {loss.item()}")
+            # dataloader should be unshuffled and have batch size of 1
+            true_arr.append(actual_after.item())
+            pred_arr.append(logits.item())
+
+            # if batch % 100 == 0:
+            #     print(f"!!!!!!!!!!!!!!!!\nBatch {batch}\n!!!!!!!!!!!!!!!\nactual prev day: {actual_prev_day}\n\n"
+            #           f"actual after: {actual_after}\n\npredicted after: {logits}\n\nmse: {manual_mse}\n\n"
+            #           f"pytorch loss: {loss.item()}")
 
         print(f"Average Loss: {total_loss / len(dataloader.dataset)}")  # total loss is the sum of each sample's loss since mse reduction is sum
+        print(f"Directional Accuracy: {self.directional_accuracy(true_arr, pred_arr)}")
+        plt.plot(range(len(true_arr)), true_arr, label="True Prices")
+        plt.plot(range(len(pred_arr)), pred_arr, label="Predicted Prices")
+        plt.xlabel("Day")
+        plt.ylabel("Price")
+        plt.legend()
+        plt.show()
 
+    def directional_accuracy(self, gt, pred):
+        """Calculates directional accuracy of given ground truth and prediction series.
+        From Kaeley et al.
 
+        inputs:
+            gt: ground truth prices
+            pred: predicted prices
 
+        returns:
+            acc: directional accuracy of predicted values
+        """
+        acc = []
+        for i in range(1, len(gt)):
+            if gt[i] >= gt[i - 1] and pred[i] >= gt[i - 1]:
+                acc.append(1)
+            elif gt[i] < gt[i - 1] and pred[i] < gt[i - 1]:
+                acc.append(1)
+            else:
+                acc.append(0)
 
-    # TODO maybe try doing labels for all encoder outputs, not just the last one?
-
-    # TODO maybe normalize inputs and outputs to be 0 to 1? subtract mean??
+        return np.array(acc).mean()
 
 
 # Positional Encoding for Transformer (batch first)
